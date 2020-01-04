@@ -26,6 +26,7 @@ maze = [[0, 0, 0, 0, 0, 1, 0, 1],
 G = nx.Graph()
 all_seen_size = 0
 all_shortest_paths = []
+seen_all = False
 
 
 # define point in the maze.
@@ -95,7 +96,7 @@ def three_mutate_random(individual):
     num = random.random()
     if num < 0.33:
         onePointMutate(individual)
-    elif num < 0.66:
+    elif num < 0.66 and not seen_all:
         addMoveMutate(individual)
     else:
         removeMoveMutate(individual)
@@ -210,6 +211,7 @@ def min_vis_dist_from_pivot(min_dist_to_pivots, min_dist_position_to_pivots, piv
 
 
 def eval(individual):
+    global seen_all
     seen_set = set()
     seen_set.update(seen_dictionary[entry_position])
     penalty = 0
@@ -217,7 +219,7 @@ def eval(individual):
     current_position = Position(entry_position.x, entry_position.y)
     prev_position = Position(current_position.x, current_position.y)
     move_ctr = 0
-    path_positions = [copy.deepcopy(current_position)]
+    path_positions = []
     min_dist_to_pivots = {}
     min_dist_index_to_pivots = {}
     for pivot in [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]:
@@ -243,6 +245,8 @@ def eval(individual):
         move_ctr = move_ctr + 1
 
         if len(seen_set) == all_seen_size:
+            seen_all = True
+            clean_individual(individual, path_positions)
             bonus = -10000
             break
     unseen_pivots = 0
@@ -255,6 +259,27 @@ def eval(individual):
         penalty = penalty / unseen_pivots
     return (all_seen_size - len(seen_set)) * 1000 + move_ctr * 10 + penalty + bonus,
     # return (all_seen_size-len(seen_set))*1000 + move_ctr*10 + penalty + bonus,
+
+
+def clean_individual(individual, path_positions):
+    i = 0
+    prev_position = Position(entry_position.x, entry_position.y)
+    for position in path_positions:
+        move = (position.x - prev_position.x, position.y - prev_position.y)
+        prev_position = position
+        move_num = -1
+        if move == (0, 0):
+            continue
+        if move == (1, 0):
+            move_num = 0
+        if move == (-1, 0):
+            move_num = 1
+        if move == (0, -1):
+            move_num = 2
+        if move == (0, 1):
+            move_num = 3
+        individual[i] = move_num
+        i = i + 1
 
 
 def print_path(best_ind):
