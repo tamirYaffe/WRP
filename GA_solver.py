@@ -8,7 +8,6 @@ from bresenham import bresenham
 
 # define the maze.
 from GUI import CellGrid
-
 maze = [[1, 1, 1, 1, 1, 1, 1],
         [0, 0, 1, 0, 0, 0, 1],
         [1, 0, 1, 0, 1, 0, 0],
@@ -27,6 +26,7 @@ maze = [[0, 0, 0, 0, 0, 1, 0, 1],
 G = nx.Graph()
 all_seen_size = 0
 all_shortest_paths = []
+
 
 # define point in the maze.
 class Position:
@@ -53,7 +53,7 @@ class Position:
                 if maze[i][j] == 1:
                     continue
                 other = Position(j, i)
-                if self.is_exsits_los(other):
+                if self.is_exsits_los(other) or other.is_exsits_los(self):
                     seen.append(other)
         return seen
 
@@ -65,8 +65,6 @@ class Position:
 
     def __str__(self):
         return str(self.x) + "," + str(self.y)
-
-
 
 
 # create seen dictionary according to the maze.
@@ -93,20 +91,96 @@ toolbox.register("individual", tools.initRepeat, creator.Individual,
                  toolbox.attr_int, 42)
 
 
+def three_mutate_random(individual):
+    num = random.random()
+    if num < 0.33:
+        onePointMutate(individual)
+    elif num < 0.66:
+        addMoveMutate(individual)
+    else:
+        removeMoveMutate(individual)
+
+
 def onePointMutate(individual):
-    index = random.randint(0, 13)
+    index = random.randint(0, all_seen_size - 1)
     move = random.randint(0, 3)
     while individual[index] is move:
         move = random.randint(0, 3)
     individual[index] = move
 
 
-def singlePointCrossover(individual1, individual2):
-    index = random.randint(1, 13)
-    child = copy.deepcopy(individual1)
-    for i in range(index, 14):
-        child[i] = individual2[i]
-    return child
+def find_max_move(current_position, min_pivot):
+    max_move = -1
+    min_dist = 10000
+    for move in range(0,4):
+        current_position = perform_move(current_position, move)
+        if current_position.x < 0 or current_position.x > len(maze[0]) - 1 or current_position.y < 0 \
+                or current_position.y > len(maze) - 1 or maze[current_position.y][current_position.x] is 1:
+            continue
+        distance = all_shortest_paths[current_position][min_pivot]
+        if distance < min_dist:
+            min_dist = distance
+            max_move = move
+    return max_move
+
+
+def addMoveMutate(individual):
+    seen_set = set()
+    seen_set.update(seen_dictionary[entry_position])
+    current_position = Position(entry_position.x, entry_position.y)
+    prev_position = Position(current_position.x, current_position.y)
+    path_positions = [copy.deepcopy(current_position)]
+    min_dist_to_pivots = {}
+    min_dist_index_to_pivots = {}
+    for pivot in [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]:
+        min_dist_to_pivots[pivot] = 100000
+        min_dist_index_to_pivots[pivot] = -1
+    index = -1
+    for move in individual:
+        index = index + 1
+        current_position = perform_move(current_position, move)
+        if current_position.x < 0 or current_position.x > len(maze[0]) - 1 or current_position.y < 0 \
+                or current_position.y > len(maze) - 1 or maze[current_position.y][current_position.x] == 1:
+            current_position = copy.deepcopy(prev_position)
+        else:
+            seen_set.update(seen_dictionary[current_position])
+            for pivot in [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]:
+                if pivot not in seen_set:
+                    min_vis_dist_from_pivot(min_dist_to_pivots, min_dist_index_to_pivots, pivot, current_position,
+                                            index)
+        prev_position = copy.deepcopy(current_position)
+        path_positions.append(copy.deepcopy(current_position))
+
+    min_dist_pivot = 10000
+    min_dist_index = -1
+    min_pivot = None
+    for pivot in [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]:
+        if pivot not in seen_set:
+            if min_dist_to_pivots[pivot] < min_dist_pivot:
+                min_dist_pivot = min_dist_to_pivots[pivot]
+                min_dist_index = min_dist_index_to_pivots[pivot]
+                min_pivot = pivot
+    if min_pivot is None:
+        return
+    index = min_dist_index
+    current_position = path_positions[index]
+    move = find_max_move(current_position, min_pivot)
+    # index = random.randint(0, all_seen_size - 1)
+    # move = random.randint(0, 3)
+    while index < len(individual):
+        temp_move = individual[index]
+        individual[index] = move
+        move = temp_move
+        index = index + 1
+
+
+def removeMoveMutate(individual):
+    index = random.randint(0, all_seen_size - 1)
+    last_move = random.randint(0, 3)
+    while index + 1 < len(individual):
+        individual[index] = individual[index + 1]
+        index = index + 1
+    individual[all_seen_size - 1] = last_move
 
 
 # define the population to be a list of individuals
@@ -154,27 +228,33 @@ def eval(individual):
         index = index + 1
         current_position = perform_move(current_position, move)
         # check for penalty
-        if current_position.x < 0 or current_position.x > len(maze[0])-1 or current_position.y < 0\
-                or current_position.y > len(maze)-1 or maze[current_position.y][current_position.x] is 1:
+        if current_position.x < 0 or current_position.x > len(maze[0]) - 1 or current_position.y < 0 \
+                or current_position.y > len(maze) - 1 or maze[current_position.y][current_position.x] is 1:
             penalty = penalty + 100
             current_position = copy.deepcopy(prev_position)
         else:
             seen_set.update(seen_dictionary[current_position])
             for pivot in [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]:
                 if pivot not in seen_set:
-                    min_vis_dist_from_pivot(min_dist_to_pivots, min_dist_index_to_pivots, pivot, current_position, index)
+                    min_vis_dist_from_pivot(min_dist_to_pivots, min_dist_index_to_pivots, pivot, current_position,
+                                            index)
         prev_position = copy.deepcopy(current_position)
         path_positions.append(copy.deepcopy(current_position))
         move_ctr = move_ctr + 1
 
         if len(seen_set) == all_seen_size:
-            bonus = 100
+            bonus = -10000
             break
+    unseen_pivots = 0
     for pivot in [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]:
         if pivot not in seen_set:
-            penalty = penalty + 10000 * (min_dist_to_pivots[pivot]) + 1000 * (all_seen_size -min_dist_index_to_pivots[pivot])
-    # return move_ctr*10 + penalty,
-    return (all_seen_size-len(seen_set))*1000 + move_ctr*10 + penalty,
+            unseen_pivots = unseen_pivots + 1
+            penalty = penalty + 10000 * (min_dist_to_pivots[pivot]) + 1000 * (
+                        all_seen_size - min_dist_index_to_pivots[pivot])
+    if unseen_pivots > 2:
+        penalty = penalty / unseen_pivots
+    return (all_seen_size - len(seen_set)) * 1000 + move_ctr * 10 + penalty + bonus,
+    # return (all_seen_size-len(seen_set))*1000 + move_ctr*10 + penalty + bonus,
 
 
 def print_path(best_ind):
@@ -198,7 +278,10 @@ def print_path(best_ind):
             break
     # for row in maze:
     #     print(row)
-    print("--- %s coverage ---" % (len(seen_set)/all_seen_size))
+    print("--- %s coverage ---" % (len(seen_set) / all_seen_size))
+    for cell in seen_dictionary:
+        if cell not in seen_set:
+            print(cell)
     root = Tk()
     CellGrid(root, len(maze), len(maze[0]), 40, maze)
     root.mainloop()
@@ -217,7 +300,7 @@ toolbox.register("mate", tools.cxTwoPoint)
 # register a mutation operator with a probability to
 # flip each attribute/gene of 0.05
 # toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
-toolbox.register("mutate", onePointMutate)
+toolbox.register("mutate", three_mutate_random)
 
 # operator for selecting individuals for breeding the next
 # generation: each individual of the current generation
@@ -238,10 +321,10 @@ def pre_processing():
             if maze[i][j] == 0:
                 all_seen_size = all_seen_size + 1
                 G.add_node(Position(j, i))
-                if j != 0 and maze[i][j-1] != 1:
-                    G.add_edge(Position(j, i), Position(j-1, i), weight=1)
-                if i != 0 and maze[i-1][j] != 1:
-                    G.add_edge(Position(j, i), Position(j, i-1), weight=1)
+                if j != 0 and maze[i][j - 1] != 1:
+                    G.add_edge(Position(j, i), Position(j - 1, i), weight=1)
+                if i != 0 and maze[i - 1][j] != 1:
+                    G.add_edge(Position(j, i), Position(j, i - 1), weight=1)
     # build all shortest dict
     all_shortest_paths = dict(nx.all_pairs_shortest_path_length(G))
     comp = nx.connected_components(G)
@@ -249,14 +332,12 @@ def pre_processing():
 
 
 def main():
-
     pre_processing()
     random.seed(128)
-
     # create an initial population of 100 individuals (where
     # each individual is a list of integers)
     pop = toolbox.population(n=1000)
-    generations = 50
+    generations = 75
 
     # CXPB  is the probability with which two individuals
     #       are crossed
@@ -343,7 +424,7 @@ def main():
 
     best_ind = tools.selBest(pop, 1)[0]
     print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
-    return  best_ind
+    return best_ind
 
 
 if __name__ == "__main__":
@@ -351,4 +432,3 @@ if __name__ == "__main__":
     best_ind = main()
     print("--- %s seconds ---" % (time.time() - start_time))
     print_path(best_ind)
-
