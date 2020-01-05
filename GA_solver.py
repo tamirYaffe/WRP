@@ -8,24 +8,11 @@ from bresenham import bresenham
 
 # define the maze.
 from GUI import CellGrid
-maze = [[1, 1, 1, 1, 1, 1, 1],
-        [0, 0, 1, 0, 0, 0, 1],
-        [1, 0, 1, 0, 1, 0, 0],
-        [1, 0, 0, 0, 0, 0, 1],
-        [1, 1, 1, 1, 1, 1, 1]]
-
-maze = [[0, 0, 0, 0, 0, 1, 0, 1],
-        [1, 1, 1, 1, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 1],
-        [0, 1, 0, 1, 0, 1, 0, 0],
-        [0, 1, 0, 0, 0, 1, 1, 0],
-        [1, 1, 0, 0, 0, 1, 0, 0],
-        [0, 1, 0, 0, 1, 1, 0, 1],
-        [0, 0, 0, 0, 0, 0, 0, 0]]
-
+toolbox = base.Toolbox()
 G = nx.Graph()
 all_seen_size = 0
 all_shortest_paths = []
+seen_dictionary = {}
 seen_all = False
 
 
@@ -67,30 +54,17 @@ class Position:
     def __str__(self):
         return str(self.x) + "," + str(self.y)
 
+maze = [[0, 0, 0, 0, 0, 1, 0, 1],
+        [1, 1, 1, 1, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 1],
+        [0, 1, 0, 1, 0, 1, 0, 0],
+        [0, 1, 0, 0, 0, 1, 1, 0],
+        [1, 1, 0, 0, 0, 1, 0, 0],
+        [0, 1, 0, 0, 1, 1, 0, 1],
+        [0, 0, 0, 0, 0, 0, 0, 0]]
 
-# create seen dictionary according to the maze.
-seen_dictionary = {}
-for i in range(0, len(maze)):
-    for j in range(0, len(maze[0])):
-        if maze[i][j] == 1:
-            continue
-        position = Position(j, i)
-        seen_dictionary[position] = position.get_seen_list()
 # define start position
 entry_position = Position(6, 7)
-
-# model
-creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-creator.create("Individual", list, fitness=creator.FitnessMin)
-
-toolbox = base.Toolbox()
-
-# List
-# 0-right, 1- left, 2- up, 3- down.
-toolbox.register("attr_int", random.randint, 0, 3)
-toolbox.register("individual", tools.initRepeat, creator.Individual,
-                 toolbox.attr_int, 42)
-
 
 def three_mutate_random(individual):
     num = random.random()
@@ -184,8 +158,7 @@ def removeMoveMutate(individual):
     individual[all_seen_size - 1] = last_move
 
 
-# define the population to be a list of individuals
-toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+
 
 
 # the goal ('fitness') function to be maximized
@@ -255,10 +228,9 @@ def eval(individual):
             unseen_pivots = unseen_pivots + 1
             penalty = penalty + 10000 * (min_dist_to_pivots[pivot]) + 1000 * (
                         all_seen_size - min_dist_index_to_pivots[pivot])
-    if unseen_pivots > 2:
-        penalty = penalty / unseen_pivots
+    # if unseen_pivots > 2:
+    #     penalty = penalty / unseen_pivots
     return (all_seen_size - len(seen_set)) * 1000 + move_ctr * 10 + penalty + bonus,
-    # return (all_seen_size-len(seen_set))*1000 + move_ctr*10 + penalty + bonus,
 
 
 def clean_individual(individual, path_positions):
@@ -312,34 +284,19 @@ def print_path(best_ind):
     root.mainloop()
 
 
-# ----------
-# Operator registration
-# ----------
-# register the goal / fitness function
-toolbox.register("evaluate", eval)
-
-# register the crossover operator
-toolbox.register("mate", tools.cxTwoPoint)
-# toolbox.register("mate", singlePointCrossover)
-
-# register a mutation operator with a probability to
-# flip each attribute/gene of 0.05
-# toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
-toolbox.register("mutate", three_mutate_random)
-
-# operator for selecting individuals for breeding the next
-# generation: each individual of the current generation
-# is replaced by the 'fittest' (best) of three individuals
-# drawn randomly from the current generation.
-toolbox.register("select", tools.selTournament, tournsize=3)
-
-
-# ----------
-
 def pre_processing():
     global all_seen_size
     global G
-    global all_shortest_paths
+    global all_shortest_paths, seen_dictionary
+
+    # create seen dictionary according to the maze.
+    for i in range(0, len(maze)):
+        for j in range(0, len(maze[0])):
+            if maze[i][j] == 1:
+                continue
+            position = Position(j, i)
+            seen_dictionary[position] = position.get_seen_list()
+
     # make graph from maze
     for i in range(0, len(maze)):
         for j in range(0, len(maze[0])):
@@ -356,8 +313,46 @@ def pre_processing():
     print(comp)
 
 
+def create_model():
+    global toolbox
+    # model
+    creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+    creator.create("Individual", list, fitness=creator.FitnessMin)
+
+    # List
+    # 0-right, 1- left, 2- up, 3- down.
+    toolbox.register("attr_int", random.randint, 0, 3)
+    toolbox.register("individual", tools.initRepeat, creator.Individual,
+                     toolbox.attr_int, 42)
+    # define the population to be a list of individuals
+    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+    # ----------
+    # Operator registration
+    # ----------
+    # register the goal / fitness function
+    toolbox.register("evaluate", eval)
+
+    # register the crossover operator
+    toolbox.register("mate", tools.cxTwoPoint)
+    # toolbox.register("mate", singlePointCrossover)
+
+    # register a mutation operator with a probability to
+    # flip each attribute/gene of 0.05
+    # toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
+    toolbox.register("mutate", three_mutate_random)
+
+    # operator for selecting individuals for breeding the next
+    # generation: each individual of the current generation
+    # is replaced by the 'fittest' (best) of three individuals
+    # drawn randomly from the current generation.
+    toolbox.register("select", tools.selTournament, tournsize=3)
+
+
 def main():
+    global toolbox
+
     pre_processing()
+    create_model()
     random.seed(128)
     # create an initial population of 100 individuals (where
     # each individual is a list of integers)
