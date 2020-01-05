@@ -60,7 +60,9 @@ class Position:
         return str(self.x) + "," + str(self.y)
 
 
-maze = [[0, 0, 0, 0, 0, 1, 0, 1],
+maze = [[1, 1, 1, 1, 1, 1, 0, 0],
+        [1, 1, 1, 1, 1, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 1],
         [1, 1, 1, 1, 0, 1, 0, 0],
         [0, 0, 0, 0, 0, 1, 0, 1],
         [0, 1, 0, 1, 0, 1, 0, 0],
@@ -70,7 +72,7 @@ maze = [[0, 0, 0, 0, 0, 1, 0, 1],
         [0, 0, 0, 0, 0, 0, 0, 0]]
 
 # define start position
-entry_position = Position(6, 7)
+entry_position = Position(6, 9)
 # pivots = [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]
 pivots = []
 
@@ -86,10 +88,13 @@ def onePointMutate(individual):
 
 
 def singlePointCrossover(individual1, individual2):
+    # make sure individual1 size is smaller then individual2 size
+    if len(individual2) < len(individual1):
+        return singlePointCrossover(individual2, individual1)
     index = random.randrange(0, len(individual1))
     child = []
     child_pivots = []
-    for i in range(0, len(individual1)):
+    for i in range(0, len(individual2)):
         if i < index:
             child.append(individual1[i])
             child_pivots.append(individual1[i][0])
@@ -98,9 +103,50 @@ def singlePointCrossover(individual1, individual2):
                 child.append(individual2[i])
                 child_pivots.append(individual2[i][0])
             else:
-                child.append(individual1[i])
-                child_pivots.append(individual1[i][0])
+                if len(individual1)<i:
+                    child.append(individual1[i])
+                    child_pivots.append(individual1[i][0])
+                else:
+                    for j in range(0, index):
+                        if individual2[j][0] not in child_pivots:
+                            child.append(individual2[j])
+                            child_pivots.append(individual2[j][0])
     return child
+
+
+def add_pivots_to_individual(seen_set, individual):
+    pivots_to_add = []
+    node_queue = Q.PriorityQueue()
+    pivot_nodes = set()
+    for node in set(G.nodes) - seen_set:
+        node_queue.put(node)
+    while not node_queue.empty():
+        node = node_queue.get()
+        if node not in pivot_nodes and len(pivot_nodes & seen_dictionary[node]) == 0:
+            pivots_to_add.append(node)
+            pivot_nodes.add(node)
+            pivot_nodes.update(seen_dictionary[node])
+    for pivot in pivots_to_add:
+        min_dist_pivot = 1000000
+        min_dist_pivot_index = 0
+        index = 0
+        for attr in individual:
+            individual_pivot = attr[0]
+            distance = len(all_shortest_paths[pivot][individual_pivot])
+            if distance < min_dist_pivot:
+                min_dist_pivot = distance
+                min_dist_pivot_index = index
+            index = index+1
+        index = min_dist_pivot_index + 1
+        pivot_watchers = list(seen_dictionary[pivot])
+        random_watcher = pivot_watchers[random.randrange(0, len(pivot_watchers))]
+        attr_to_add = (pivot, random_watcher)
+        while index < len(individual):
+            temp_attr = individual[index]
+            individual[index] = attr_to_add
+            attr_to_add = temp_attr
+            index = index + 1
+        individual.append(attr_to_add)
 
 
 def eval(individual):
@@ -119,8 +165,9 @@ def eval(individual):
         move_ctr = move_ctr + len(path)
         if len(path) > 0:
             current_position = path[-1]
-        # if len(seen_set) == all_seen_size:
-        #     break
+    if len(seen_set) != all_seen_size:
+        add_pivots_to_individual(seen_set, individual)
+        return eval(individual)
     return move_ctr,
 
 
