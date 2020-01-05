@@ -16,6 +16,7 @@ G = nx.Graph()
 all_seen_size = 0
 all_shortest_paths = []
 seen_dictionary = {}
+random.seed(128)
 
 
 # define point in the maze.
@@ -72,9 +73,20 @@ maze = [[1, 1, 1, 1, 1, 1, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0]]
 
 # define start position
-entry_position = Position(6, 9)
+# entry_position = Position(6, 9)
+entry_position = Position(0, 0)
 # pivots = [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]
 pivots = []
+
+
+
+
+def two_mutate_random(individual):
+    num = random.random()
+    if num < 0.5:
+        onePointMutate(individual)
+    else:
+        swapMutate(individual)
 
 
 def onePointMutate(individual):
@@ -87,10 +99,20 @@ def onePointMutate(individual):
     individual[index] = (pivot, watcher)
 
 
+def swapMutate(individual):
+    index1 = random.randrange(0, len(individual))
+    index2 = random.randrange(0, len(individual))
+    while index1 is index2:
+        index2 = random.randrange(0, len(individual))
+    temp = individual[index2]
+    individual[index2] = individual[index1]
+    individual[index1] = temp
+
+def singlePointCrossoverTwoChilds(individual1, individual2):
+    return singlePointCrossover(individual1, individual2), singlePointCrossover(individual2, individual1)
+
+
 def singlePointCrossover(individual1, individual2):
-    # make sure individual1 size is smaller then individual2 size
-    if len(individual2) < len(individual1):
-        return singlePointCrossover(individual2, individual1)
     index = random.randrange(0, len(individual1))
     child = []
     child_pivots = []
@@ -103,7 +125,7 @@ def singlePointCrossover(individual1, individual2):
                 child.append(individual2[i])
                 child_pivots.append(individual2[i][0])
             else:
-                if len(individual1)<i:
+                if len(individual1) > i:
                     child.append(individual1[i])
                     child_pivots.append(individual1[i][0])
                 else:
@@ -111,6 +133,10 @@ def singlePointCrossover(individual1, individual2):
                         if individual2[j][0] not in child_pivots:
                             child.append(individual2[j])
                             child_pivots.append(individual2[j][0])
+    if len(child) < len(individual1):
+        for attr in individual1:
+            if attr[0] not in child_pivots:
+                child.append(attr)
     return child
 
 
@@ -260,13 +286,12 @@ def create_model():
     toolbox.register("evaluate", eval)
 
     # register the crossover operator
-    toolbox.register("mate", singlePointCrossover)
-    # toolbox.register("mate", singlePointCrossover)
+    toolbox.register("mate", singlePointCrossoverTwoChilds)
 
     # register a mutation operator with a probability to
     # flip each attribute/gene of 0.05
     # toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
-    toolbox.register("mutate", onePointMutate)
+    toolbox.register("mutate", two_mutate_random)
 
     # operator for selecting individuals for breeding the next
     # generation: each individual of the current generation
@@ -281,8 +306,8 @@ def main():
     create_model()
     # create an initial population of 100 individuals (where
     # each individual is a list of integers)
-    pop = toolbox.population(n=100)
-    generations = 30
+    pop = toolbox.population(n=200)
+    generations = 50
 
     # CXPB  is the probability with which two individuals
     #       are crossed
@@ -372,8 +397,27 @@ def main():
     return best_ind
 
 
+def make_maze_from_file(map_file):
+    lines = []
+    for line in map_file:
+        lines.append(line)
+    height = int(lines[1].split()[1])
+    width = int(lines[2].split()[1])
+    maze = [[0 for x in range(width)] for y in range(height)]
+    for i in range(0, len(maze)):
+        maze_row = lines[i+4]
+        for j in range(0, len(maze[0])):
+            cell = 1
+            if maze_row[j] == ".":
+                cell = 0
+            maze[i][j] = cell
+    # print_maze(maze)
+    return maze
+
 if __name__ == "__main__":
-    random.seed(128)
+    map_file = open("maps/maze_11X11.map", "r")
+    maze = make_maze_from_file(map_file)
+    map_file.close()
     pre_processing()
 
     start_time = time.time()
