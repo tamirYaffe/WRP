@@ -16,7 +16,7 @@ G = nx.Graph()
 all_seen_size = 0
 all_shortest_paths = []
 seen_dictionary = {}
-random.seed(128)
+pivots_frontiers = {}
 
 
 # define point in the maze.
@@ -73,15 +73,13 @@ maze = [[1, 1, 1, 1, 1, 1, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0]]
 
 # define start position
-entry_position = Position(6, 9)
+# entry_position = Position(6, 9)
 # entry_position = Position(0, 0)
 # entry_position = Position(2, 1)
-# entry_position = Position(11, 40)
+entry_position = Position(12, 40)
 # entry_position = Position(22, 2)
 # pivots = [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]
 pivots = []
-
-
 
 
 def two_mutate_random(individual):
@@ -95,7 +93,7 @@ def two_mutate_random(individual):
 def onePointMutate(individual):
     index = random.randrange(0, len(individual))
     pivot = individual[index][0]
-    pivot_watchers = list(seen_dictionary[pivot])
+    pivot_watchers = list(pivots_frontiers[pivot])
     watcher = pivot_watchers[random.randrange(0, len(pivot_watchers))]
     while individual[index][1] is watcher:
         watcher = pivot_watchers[random.randrange(0, len(pivot_watchers))]
@@ -165,8 +163,9 @@ def add_pivots_to_individual(seen_set, individual):
             if distance < min_dist_pivot:
                 min_dist_pivot = distance
                 min_dist_pivot_index = index
-            index = index+1
+            index = index + 1
         index = min_dist_pivot_index + 1
+        add_pivot_frontiers(pivot)
         pivot_watchers = list(seen_dictionary[pivot])
         random_watcher = pivot_watchers[random.randrange(0, len(pivot_watchers))]
         attr_to_add = (pivot, random_watcher)
@@ -216,6 +215,23 @@ def print_path(best_ind):
     root.mainloop()
 
 
+def add_pivot_frontiers(pivot):
+    to_remove = set()
+    pivot_watchers = seen_dictionary[pivot]
+    for watcher in pivot_watchers:
+        remove = True
+        for move in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+            current_position = Position(watcher.x + move[0], watcher.y + move[1])
+            if not (current_position.x < 0 or current_position.x > len(maze[0]) - 1 or current_position.y < 0
+                    or current_position.y > len(maze) - 1 or maze[current_position.y][current_position.x] == 1
+                    or current_position in pivots or current_position in pivot_watchers):
+                remove = FALSE
+                break
+        if remove:
+            to_remove.add(watcher)
+    pivots_frontiers[pivot] = pivot_watchers - to_remove
+
+
 def pre_processing():
     global all_seen_size
     global G
@@ -254,7 +270,9 @@ def pre_processing():
             pivots.append(node)
             pivot_nodes.add(node)
             pivot_nodes.update(seen_dictionary[node])
-
+    # create pivot frontier dict
+    for pivot in pivots:
+        add_pivot_frontiers(pivot)
 
 
 
@@ -262,7 +280,7 @@ def random_init():
     global pivots, seen_dictionary
     individual = []
     for i in np.random.permutation(len(pivots)):
-        pivot_watchers = list(seen_dictionary[pivots[i]])
+        pivot_watchers = list(pivots_frontiers[pivots[i]])
         random_watcher = pivot_watchers[random.randrange(0, len(pivot_watchers))]
         individual.append((pivots[i], random_watcher))
     return individual
@@ -309,8 +327,8 @@ def main():
     create_model()
     # create an initial population of 100 individuals (where
     # each individual is a list of integers)
-    pop = toolbox.population(n=100)
-    generations = 30
+    pop = toolbox.population(n=1000)
+    generations = 75
 
     # CXPB  is the probability with which two individuals
     #       are crossed
@@ -411,7 +429,7 @@ def make_maze_from_file(map_file):
     width = int(lines[2].split()[1])
     maze = [[0 for x in range(width)] for y in range(height)]
     for i in range(0, len(maze)):
-        maze_row = lines[i+4]
+        maze_row = lines[i + 4]
         for j in range(0, len(maze[0])):
             cell = 1
             if maze_row[j] == ".":
@@ -420,10 +438,11 @@ def make_maze_from_file(map_file):
     # print_maze(maze)
     return maze
 
+
 if __name__ == "__main__":
-    # map_file = open("maps/den020d.map", "r")
-    # maze = make_maze_from_file(map_file)
-    # map_file.close()
+    map_file = open("maps/den101d.map", "r")
+    maze = make_maze_from_file(map_file)
+    map_file.close()
     pre_processing()
 
     start_time = time.time()
