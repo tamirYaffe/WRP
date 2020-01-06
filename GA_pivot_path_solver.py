@@ -73,8 +73,11 @@ maze = [[1, 1, 1, 1, 1, 1, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0]]
 
 # define start position
-# entry_position = Position(6, 9)
-entry_position = Position(0, 0)
+entry_position = Position(6, 9)
+# entry_position = Position(0, 0)
+# entry_position = Position(2, 1)
+# entry_position = Position(11, 40)
+# entry_position = Position(22, 2)
 # pivots = [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]
 pivots = []
 
@@ -209,7 +212,7 @@ def print_path(best_ind):
     for position in path_positions:
         maze[position.y][position.x] = 2
     root = Tk()
-    CellGrid(root, len(maze), len(maze[0]), 40, maze)
+    CellGrid(root, len(maze), len(maze[0]), 10, maze)
     root.mainloop()
 
 
@@ -306,8 +309,8 @@ def main():
     create_model()
     # create an initial population of 100 individuals (where
     # each individual is a list of integers)
-    pop = toolbox.population(n=200)
-    generations = 50
+    pop = toolbox.population(n=100)
+    generations = 30
 
     # CXPB  is the probability with which two individuals
     #       are crossed
@@ -393,7 +396,10 @@ def main():
     print("-- End of (successful) evolution --")
 
     best_ind = tools.selBest(pop, 1)[0]
-    print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
+    # print("Best individual is %s, %s" % (best_ind, best_ind.fitness.values))
+    print("best individual is")
+    for attr in best_ind:
+        print(attr[1])
     return best_ind
 
 
@@ -415,9 +421,9 @@ def make_maze_from_file(map_file):
     return maze
 
 if __name__ == "__main__":
-    map_file = open("maps/maze_11X11.map", "r")
-    maze = make_maze_from_file(map_file)
-    map_file.close()
+    # map_file = open("maps/den020d.map", "r")
+    # maze = make_maze_from_file(map_file)
+    # map_file.close()
     pre_processing()
 
     start_time = time.time()
