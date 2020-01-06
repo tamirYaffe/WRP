@@ -17,7 +17,7 @@ all_seen_size = 0
 all_shortest_paths = []
 seen_dictionary = {}
 pivots_frontiers = {}
-
+all_frontiers = set()
 
 # define point in the maze.
 class Position:
@@ -73,10 +73,10 @@ maze = [[1, 1, 1, 1, 1, 1, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0]]
 
 # define start position
-# entry_position = Position(6, 9)
+entry_position = Position(6, 9)
 # entry_position = Position(0, 0)
 # entry_position = Position(2, 1)
-entry_position = Position(12, 40)
+# entry_position = Position(12, 40)
 # entry_position = Position(22, 2)
 # pivots = [Position(7, 1), Position(0, 6), Position(0, 4), Position(1, 0)]
 pivots = []
@@ -166,7 +166,7 @@ def add_pivots_to_individual(seen_set, individual):
             index = index + 1
         index = min_dist_pivot_index + 1
         add_pivot_frontiers(pivot)
-        pivot_watchers = list(seen_dictionary[pivot])
+        pivot_watchers = list(pivots_frontiers[pivot])
         random_watcher = pivot_watchers[random.randrange(0, len(pivot_watchers))]
         attr_to_add = (pivot, random_watcher)
         while index < len(individual):
@@ -273,6 +273,18 @@ def pre_processing():
     # create pivot frontier dict
     for pivot in pivots:
         add_pivot_frontiers(pivot)
+    # update pivot front frontiers
+    for pivot in pivots:
+        all_frontiers.update(pivots_frontiers[pivot])
+    reachable_frontiers = set()
+    for frontier in all_frontiers:
+        if len(set(all_shortest_paths[entry_position][frontier][:-1]) & all_frontiers) == 0:
+            reachable_frontiers.add(frontier)
+    for pivot in pivots:
+        pivot_front_frontiers = pivots_frontiers[pivot] & reachable_frontiers
+        if len(pivot_front_frontiers) > 0:
+            pivots_frontiers[pivot] = pivot_front_frontiers
+
 
 
 
@@ -327,8 +339,8 @@ def main():
     create_model()
     # create an initial population of 100 individuals (where
     # each individual is a list of integers)
-    pop = toolbox.population(n=1000)
-    generations = 75
+    pop = toolbox.population(n=50)
+    generations = 30
 
     # CXPB  is the probability with which two individuals
     #       are crossed
@@ -440,9 +452,9 @@ def make_maze_from_file(map_file):
 
 
 if __name__ == "__main__":
-    map_file = open("maps/den101d.map", "r")
-    maze = make_maze_from_file(map_file)
-    map_file.close()
+    # map_file = open("maps/den101d.map", "r")
+    # maze = make_maze_from_file(map_file)
+    # map_file.close()
     pre_processing()
 
     start_time = time.time()
